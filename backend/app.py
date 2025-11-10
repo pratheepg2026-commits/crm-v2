@@ -39,11 +39,26 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
-# Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres.hhmvkaovdblngqpwapqs:Pswd@supabase#84@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres')
+# --- DATABASE CONFIGURATION ---
+db_user = os.getenv('DB_USER', 'postgres')
+db_password = quote_plus(os.getenv('DB_PASSWORD', ''))
+db_host = os.getenv('DB_HOST', 'localhost')
+db_port = os.getenv('DB_PORT', '5432')
+db_name = os.getenv('DB_NAME', 'postgres')
+
+database_url = f'postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}'
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'e+7gc977opUMGtvRxIevza5WtvKd3uEfLt8dkA7kt73EDkhgK3Cf7XDI5Qj7bbWqHW+U6SgAnQnRDAs4PLc96g==')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+    'pool_timeout': 30,
+    'pool_size': 10,
+    'max_overflow': 20
+}
+
+db = SQLAlchemy(app)
 
 # Initialize extensions
 db = SQLAlchemy(app)
