@@ -17,7 +17,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres.hhmvkaovdblngqpwapqs:[YOUR-PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'postgresql://postgres.hhmvkaovdblngqpwapqs:Pswd@supabase#84@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'e+7gc977opUMGtvRxIevza5WtvKd3uEfLt8dkA7kt73EDkhgK3Cf7XDI5Qj7bbWqHW+U6SgAnQnRDAs4PLc96g==')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=30)
