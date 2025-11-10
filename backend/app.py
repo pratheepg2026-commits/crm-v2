@@ -8,6 +8,8 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
 import os
+from urllib.parse import quote_plus
+
 from dotenv import load_dotenv
 # --- ENVIRONMENT SETUP ---
 try:
