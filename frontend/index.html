@@ -2598,7 +2598,147 @@ tbody tr:hover {
     </div>
 
     <script>
+        // ==================== API CONFIGURATION ====================
+const API_URL = 'https://crm-v2-backend.onrender.com/api';
+
+// ==================== AUTHENTICATION HELPER ====================
+async function apiCall(endpoint, method = 'GET', body = null) {
+    const token = localStorage.getItem('access_token');
+    
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if (token) {
+        options.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(`${API_URL}${endpoint}`, options);
+    
+    // Handle 401 Unauthorized
+    if (response.status === 401) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('currentUser');
+        window.location.reload();
+        return null;
+    }
+    
+    if (!response.ok) {
+        throw new Error(`API Error: ${response.statusText}`);
+    }
+    
+    return response.json();
+}
+
         // Data Storage
+        // ==================== API CONFIGURATION ====================
+const API_URL = 'https://crm-v2-backend.onrender.com/api';
+
+// ==================== API HELPER FUNCTION ====================
+async function apiCall(endpoint, method = 'GET', body = null) {
+    const token = localStorage.getItem('access_token');
+    
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if (token) {
+        options.headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}${endpoint}`, options);
+        
+        // Handle 401 Unauthorized - token expired
+        if (response.status === 401) {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('currentUser');
+            showLoginPage();
+            return null;
+        }
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `API Error: ${response.statusText}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('API Call Error:', error);
+        showAlert('error', error.message || 'Failed to connect to server');
+        throw error;
+    }
+}
+
+// ==================== DATA LOADING FUNCTIONS ====================
+async function loadAllDataFromBackend() {
+    try {
+        console.log('🔄 Loading data from backend...');
+        
+        const [
+            productsData,
+            warehousesData,
+            salesData,
+            expensesData,
+            subscriptionsData,
+            inventoryData
+        ] = await Promise.all([
+            apiCall('/products').catch(() => []),
+            apiCall('/warehouses').catch(() => []),
+            apiCall('/sales').catch(() => []),
+            apiCall('/expenses').catch(() => []),
+            apiCall('/subscriptions').catch(() => []),
+            apiCall('/inventory').catch(() => [])
+        ]);
+        
+        products = productsData || [];
+        warehouses = warehousesData || [];
+        sales = salesData || [];
+        expenses = expensesData || [];
+        subscriptions = subscriptionsData || [];
+        warehouseInventory = inventoryData || [];
+        
+        console.log('✅ Data loaded successfully from backend');
+        console.log('Products:', products.length);
+        console.log('Warehouses:', warehouses.length);
+        console.log('Sales:', sales.length);
+        
+        // Refresh current section
+        const currentSectionEl = document.querySelector('.section.active');
+        if (currentSectionEl) {
+            renderSectionContent(currentSectionEl.id);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error loading data from backend:', error);
+        showAlert('error', 'Failed to load data from server. Using local data.');
+    }
+}
+
+async function loadDashboardMetricsFromBackend() {
+    try {
+        const metrics = await apiCall('/analytics/dashboard');
+        return metrics;
+    } catch (error) {
+        console.error('Error loading dashboard metrics:', error);
+        return null;
+    }
+}
+
 let products = [];
 let sales = [];
 let inventoryLog = [];
@@ -2787,22 +2927,18 @@ function checkUserSession() {
 }
 
 // Initialize CRM App (after user logs in)
-function initializeCRMApp() {
-    // Set today's date in all date fields
+async function initializeCRMApp() {
     const today = new Date().toISOString().split('T')[0];
     document.querySelectorAll('input[type="date"]').forEach(input => {
         input.value = today;
     });
 
-    // Load warehouses first
-    loadSampleWarehouses();
-    
-    // Load sample data AFTER warehouses
-    loadSampleData();
+  
     
     // Setup event listeners
     setupEventListeners();
-
+    
+ await loadAllDataFromBackend();
     // Update date time
     updateDateTime();
     
@@ -2812,6 +2948,7 @@ function initializeCRMApp() {
     // CRITICAL FIX: Ensure dashboard renders with all metrics visible immediately
     // Dashboard should already be active, just render it
     renderDashboard();
+   
 }
 
 // Initialize App
@@ -2879,46 +3016,48 @@ function showLoginPage() {
 }
 
 // Handle Login
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
     
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     const errorDiv = document.getElementById('loginError');
     
-    // Find user in demo accounts
-    const user = demoAccounts.find(
-        account => account.email === email && account.password === password
-    );
-    
-    if (user) {
-        // CRITICAL FIX: Save user to global variable (no localStorage)
-        currentUser = user;
+    try {
+        // Call backend login API
+        const response = await fetch(`${API_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
         
-        // CRITICAL FIX: Remove login overlay and show CRM
-        const loginOverlay = document.getElementById('loginOverlay');
-        if (loginOverlay) {
-            loginOverlay.remove();
+        if (!response.ok) {
+            throw new Error('Invalid email or password');
         }
+        
+        const data = await response.json();
+        
+        // Save user and token
+        currentUser = data.user;
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        
+        // Remove login overlay
+        const loginOverlay = document.getElementById('loginOverlay');
+        if (loginOverlay) loginOverlay.remove();
         
         const appContainer = document.querySelector('.app-container');
-        if (appContainer) {
-            appContainer.style.display = 'flex';
-        }
+        if (appContainer) appContainer.style.display = 'flex';
         
-        const mobileToggle = document.getElementById('mobileMenuToggle');
-        if (mobileToggle) {
-            mobileToggle.style.display = 'block';
-        }
+        // Initialize CRM
+        await initializeCRMApp();
         
-        // Initialize CRM app and render dashboard immediately
-        initializeCRMApp();
-    } else {
-        // Show error
-        errorDiv.textContent = '❌ Invalid email or password. Please try again.';
+    } catch (error) {
+        errorDiv.textContent = error.message || 'Login failed. Please try again.';
         errorDiv.style.display = 'block';
     }
 }
+
 
 // Fill Demo Credentials
 function fillDemoCredentials() {
@@ -3071,32 +3210,6 @@ function updateDateTime() {
 }
 
 // Load Sample Warehouses
-function loadSampleWarehouses() {
-    const sampleWarehouses = [
-        { name: 'Main Store', location: 'Mangalapuram', capacity: 500, manager: 'Ramesh', managerContact: '9876543210', status: 'Active', createdAt: new Date(2025, 0, 5).toISOString() },
-        { name: 'Cold Storage', location: 'Market Road', capacity: 300, manager: 'Suresh', managerContact: '9876543211', status: 'Active', createdAt: new Date(2025, 0, 4).toISOString() },
-        { name: 'Secondary Warehouse', location: 'Industrial Area', capacity: 400, manager: 'Rajesh', managerContact: '9876543212', status: 'Active', createdAt: new Date(2025, 0, 3).toISOString() }
-    ];
-
-    sampleWarehouses.forEach(w => {
-        warehouses.push({
-            id: nextId.warehouse++,
-            ...w
-        });
-    });
-}
-
-// Load Sample Data
-function loadSampleData() {
-    // Sample Products (simplified - no category, stock, restock level)
-    const sampleProducts = [
-        { name: 'Button Mushroom', unit: 'kg', retailPrice: 280, wholesalePrice: 200 },
-        { name: 'Oyster Mushroom', unit: 'kg', retailPrice: 320, wholesalePrice: 240 },
-        { name: 'Shiitake Mushroom', unit: 'kg', retailPrice: 500, wholesalePrice: 380 },
-        { name: 'Mixed Mushroom', unit: 'box', retailPrice: 450, wholesalePrice: 350 },
-        { name: 'Mushroom Spawn', unit: 'box', retailPrice: 150, wholesalePrice: 120 }
-    ];
-
     sampleProducts.forEach((p, idx) => {
         products.push({
             id: nextId.product++,
@@ -3974,9 +4087,19 @@ function populateWarehouseDropdown(elementId) {
 }
 
 // Dashboard Rendering
-function renderDashboard() {
-    // CRITICAL FIX: Calculate metrics immediately with all available data
-    // Ensure data is loaded before calculation
+async function renderDashboard() {
+    // Load metrics from backend
+    const metricsFromBackend = await loadDashboardMetricsFromBackend();
+    
+    if (metricsFromBackend) {
+        // Use backend metrics
+        document.getElementById('overallProfitValue').textContent = 
+            `₹${metricsFromBackend.profit.toLocaleString()}`;
+        // ... update other elements with backend data
+    }
+    
+    // ... rest of existing dashboard code ...
+
     if (products.length === 0 || warehouses.length === 0) {
         console.log('Waiting for data to load...');
         setTimeout(renderDashboard, 50);
