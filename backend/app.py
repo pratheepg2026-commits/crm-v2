@@ -60,7 +60,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'max_overflow': 20
 }
 
-db = SQLAlchemy(app)
+
 
 # Initialize extensions
 db = SQLAlchemy(app)
