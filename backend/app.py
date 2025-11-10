@@ -9,6 +9,29 @@ from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
+# --- ENVIRONMENT SETUP ---
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(dotenv_path='.env', override=False):
+        try:
+            if not os.path.exists(dotenv_path):
+                return False
+            with open(dotenv_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    if '=' not in line:
+                        continue
+                    key, val = line.split('=', 1)
+                    key = key.strip()
+                    val = val.strip().strip('\'"')
+                    if override or key not in os.environ:
+                        os.environ[key] = val
+            return True
+        except Exception:
+            return False
 
 # Load environment variables
 load_dotenv()
